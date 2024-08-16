@@ -6,7 +6,7 @@ import plotly.express as px
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from openai import OpenAI
+from openai import OpenAI as OpenAIClient
 from pandasai.llm.openai import OpenAI
 from pandasai import Agent
 from dotenv import load_dotenv
@@ -31,7 +31,7 @@ class DataAnalysisChatbot:
         if not self.openai_api_key:
             st.warning("OpenAI API key not found in .env file. Please set the OPENAI_API_KEY variable in your .env file.")
         else:
-            self.client = OpenAI(api_key=self.openai_api_key)
+            self.client = OpenAIClient(api_key=self.openai_api_key)
 #ANTHROPIC
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         if not self.anthropic_api_key:
@@ -334,6 +334,25 @@ UTILIZING THIS IDEA: Go through the data file and only return the data that we w
 Also return queires that we can put into a pandasAI chatbot model.
   """
 
+#OPENAI
+            queries = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful data analyst assistant with direct access to pandas dataframes."},
+                    {"role": "user", "content": prompts}
+                ]
+            )
+#pandasAI right here
+
+            PromptPanda = f"""
+            You are a data analysis calculator that take in the following data {summary}, and calulates the values from it using
+            the queries that are provided by a previous llm model. The queries are as follows: {queries}
+            """
+
+            llm = OpenAI(model_name="gpt-4o", api_key='OPENAI_API_KEY')
+            agent = Agent(list(self.dataframes.values()),config={"llm": llm})
+            DataValues = agent.chat(f"{PromptPanda}")
+
             prompt = f"""
 I am working on a project that requires cross-analyzing multiple data files simultaneously, rather than examining each file in isolation. The goal is to derive deep, insightful conclusions that can have a significant impact on the business. Below, I describe four distinct methods for conducting this analysis: a theme-driven method, a question-driven method, a data-driven exploratory analysis method, and an iterative hypothesis-testing method.
 
@@ -380,22 +399,6 @@ Exclusivity: Do not incorporate any external data sources or assumptions beyond 
 Focus: Prioritize insights that can significantly influence business strategy or operations.      
 
             """
-            PromptPanda = f"""
-            You are a data analysis calculator that take in the following data {summary}, and calulates the values from it using
-            the queries that are provided by a previous llm model. The queries are as follows: {queries}
-            """
-#OPENAI
-            queries = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a helpful data analyst assistant with direct access to pandas dataframes."},
-                    {"role": "user", "content": prompts}
-                ]
-            )
-#pandasAI right here
-            llm = OpenAI(model_name="gpt-4o", api_key='OPENAI_API_KEY')
-            agent = Agent(config={"llm": llm})
-            DataValues = agent.chat(f"{PromptPanda}")
 
 #Second LLM
             response = self.client.chat.completions.create(
